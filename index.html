@@ -27,7 +27,7 @@
 <div class="app-card">
     <img src="hero.jpg" class="hero-img">
     <div class="form-content">
-        <div id="loading" style="text-align:center; padding:20px;">資料載入中，請稍候...</div>
+        <div id="loading" style="text-align:center; padding:20px;">資料載入中...</div>
         <div id="app" style="display:none;">
             <div class="input-group"><label>姓名</label><input type="text" id="name"></div>
             <div class="input-group"><label>員工編號</label><input type="text" id="staffId"></div>
@@ -43,49 +43,46 @@
 <a href="mailto:share.imc.6900@gmail.com?subject=諮詢周邊活動預約" class="contact-icon">📩</a>
 
 <script>
-    // 這是最終確定的發布網址 (GID=29777723)
-    const FINAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=29777723&single=true&output=csv";
+    // 鎖定您的最新發布連結
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=29777723&single=true&output=csv&cache=" + Date.now();
 
     async function init() {
         try {
-            // 使用 no-cache 模式強制重新抓取最新資料
-            const res = await fetch(FINAL_URL + "&cache_bust=" + Date.now());
-            if (!res.ok) throw new Error("Fetch failed");
+            const res = await fetch(CSV_URL);
             const csvText = await res.text();
             
-            // 解析 CSV
-            const rows = csvText.split('\n').filter(r => r.trim() !== "").map(row => 
+            // 強化版 CSV 解析：處理換行與空行
+            const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "").map(row => 
                 row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim())
             );
             
-            const headers = rows[0];
-            const data = rows.slice(1).map(row => {
-                let obj = {};
-                headers.forEach((h, i) => { if(h) obj[h] = row[i]; });
-                return obj;
-            });
+            if (rows.length < 2) throw new Error("No Data");
 
-            // 1. 填充公司
+            // 1. 公司選單 (抓取第一欄 A)
             const compSelect = document.getElementById('company');
-            const comps = [...new Set(data.map(d => d["公司清單"]).filter(d => d))];
+            const comps = [...new Set(rows.slice(1).map(r => r[0]).filter(c => c))];
             comps.forEach(c => compSelect.add(new Option(c, c)));
 
-            // 2. 填充課程
+            // 2. 課程列表 (抓取第二、三欄 B, C)
             const list = document.getElementById('course-list');
-            data.filter(d => d["課程名稱"]).forEach(c => {
-                const remains = parseInt(c["剩餘名額"]) || 0;
+            rows.slice(1).forEach(r => {
+                const cName = r[1];
+                const cQuota = r[2];
+                if (!cName) return;
+
+                const remains = parseInt(cQuota) || 0;
                 const isFull = remains <= 0;
                 const div = document.createElement('div');
                 div.className = `course-option ${isFull ? 'disabled' : ''}`;
                 div.innerHTML = `
-                    <span>${c["課程名稱"]} <span class="badge">${isFull ? '額滿' : '剩 '+remains}</span></span>
+                    <span>${cName} <span class="badge">${isFull ? '額滿' : '剩 '+remains}</span></span>
                     <div class="people-container">
-                        <span style="font-size:12px; color:#666;">人數:</span>
                         <select class="people-select" onclick="event.stopPropagation()">
                             <option value="1位">1位</option><option value="2位">2位</option><option value="3位">3位</option>
                         </select>
-                        <input type="checkbox" class="course-check" value="${c["課程名稱"]}" style="display:none">
+                        <input type="checkbox" class="course-check" value="${cName}" style="display:none">
                     </div>`;
+                
                 if(!isFull) div.onclick = () => {
                     const cb = div.querySelector('input');
                     if(!cb.checked && document.querySelectorAll('.course-check:checked').length >= 3) return alert("最多選3堂喔！");
@@ -98,8 +95,7 @@
             document.getElementById('loading').style.display = 'none';
             document.getElementById('app').style.display = 'block';
         } catch (e) {
-            console.error("載入出錯：", e);
-            document.getElementById('loading').innerHTML = "資料同步中，請按 <b>F5</b> 重新整理網頁。<br><small>(錯誤代碼：ID_SYNC_ERR)</small>";
+            document.getElementById('loading').innerText = "系統初始化中，請稍候重整 (F5)。";
         }
     }
 
@@ -110,9 +106,7 @@
         const dept = document.getElementById('dept').value;
         const email = document.getElementById('email').value;
         const selected = Array.from(document.querySelectorAll('.course-option.selected')).map(el => {
-            const courseName = el.querySelector('.course-check').value;
-            const pCount = el.querySelector('.people-select').value;
-            return `${courseName}_${pCount}`;
+            return `${el.querySelector('.course-check').value}_${el.querySelector('.people-select').value}`;
         });
 
         if(!name || !email || !company || selected.length === 0) return alert("資料填寫不完整喔！");
@@ -127,9 +121,9 @@
         selected.forEach(s => p.append("entry.209578556", s));
 
         fetch(googleUrl + p.toString(), { mode: 'no-cors' }).then(() => {
-            alert("預約成功！確認信將發送至您的信箱。");
+            alert("預約成功！");
             location.reload();
-        }).catch(() => alert("送出失敗，請檢查網路。"));
+        }).catch(() => alert("送出失敗"));
     }
     init();
 </script>
