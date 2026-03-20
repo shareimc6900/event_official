@@ -27,7 +27,7 @@
 <div class="app-card">
     <img src="hero.jpg" class="hero-img">
     <div class="form-content">
-        <div id="loading" style="text-align:center; padding:20px;">資料載入中...</div>
+        <div id="loading" style="text-align:center; padding:20px;">資料同步中，請稍候...</div>
         <div id="app" style="display:none;">
             <div class="input-group"><label>姓名</label><input type="text" id="name"></div>
             <div class="input-group"><label>員工編號</label><input type="text" id="staffId"></div>
@@ -43,39 +43,39 @@
 <a href="mailto:share.imc.6900@gmail.com?subject=諮詢周邊活動預約" class="contact-icon">📩</a>
 
 <script>
-    // 鎖定您的最新發布連結
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=29777723&single=true&output=csv&cache=" + Date.now();
+    // 鎖定 GID=29777723 的發布網址
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=29777723&single=true&output=csv&cache=" + new Date().getTime();
 
     async function init() {
         try {
             const res = await fetch(CSV_URL);
-            const csvText = await res.text();
+            const text = await res.text();
             
-            // 強化版 CSV 解析：處理換行與空行
-            const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "").map(row => 
-                row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim())
-            );
-            
-            if (rows.length < 2) throw new Error("No Data");
+            // 更精準的 CSV 解析：過濾掉空行與空字串
+            const rows = text.split(/\r?\n/)
+                             .map(row => row.split(',').map(cell => cell.replace(/^"|"$/g, '').trim()))
+                             .filter(row => row.some(cell => cell !== ""));
+
+            if (rows.length < 2) throw new Error("無效的資料內容");
 
             // 1. 公司選單 (抓取第一欄 A)
             const compSelect = document.getElementById('company');
-            const comps = [...new Set(rows.slice(1).map(r => r[0]).filter(c => c))];
+            const comps = [...new Set(rows.slice(1).map(r => r[0]).filter(c => c && c !== "公司清單"))];
             comps.forEach(c => compSelect.add(new Option(c, c)));
 
-            // 2. 課程列表 (抓取第二、三欄 B, C)
+            // 2. 課程列表 (抓取第二欄 B 與 第三欄 C)
             const list = document.getElementById('course-list');
-            rows.slice(1).forEach(r => {
-                const cName = r[1];
-                const cQuota = r[2];
-                if (!cName) return;
+            const courses = rows.slice(1).filter(r => r[1] && r[1] !== "課程名稱");
 
-                const remains = parseInt(cQuota) || 0;
-                const isFull = remains <= 0;
+            courses.forEach(r => {
+                const cName = r[1];
+                const cQuota = parseInt(r[2]) || 0;
+                const isFull = cQuota <= 0;
+                
                 const div = document.createElement('div');
                 div.className = `course-option ${isFull ? 'disabled' : ''}`;
                 div.innerHTML = `
-                    <span>${cName} <span class="badge">${isFull ? '額滿' : '剩 '+remains}</span></span>
+                    <span>${cName} <span class="badge">${isFull ? '額滿' : '剩 '+cQuota}</span></span>
                     <div class="people-container">
                         <select class="people-select" onclick="event.stopPropagation()">
                             <option value="1位">1位</option><option value="2位">2位</option><option value="3位">3位</option>
@@ -95,7 +95,8 @@
             document.getElementById('loading').style.display = 'none';
             document.getElementById('app').style.display = 'block';
         } catch (e) {
-            document.getElementById('loading').innerText = "系統初始化中，請稍候重整 (F5)。";
+            console.error("初始化錯誤:", e);
+            document.getElementById('loading').innerHTML = "資料載入中，請嘗試<b>重新整理 (F5)</b>。<br>若持續失敗請聯繫技術窗口。";
         }
     }
 
