@@ -43,15 +43,17 @@
 <a href="mailto:share.imc.6900@gmail.com?subject=諮詢周邊活動預約" class="contact-icon">📩</a>
 
 <script>
-    // 根據您 5:07 PM 最新截圖更新的發布連結 (GID 變更為 29777723)
-    const FINAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=29777723&single=true&output=csv&t=" + new Date().getTime();
+    // 這是最終確定的發布網址 (GID=29777723)
+    const FINAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=29777723&single=true&output=csv";
 
     async function init() {
         try {
-            const res = await fetch(FINAL_URL);
-            if (!res.ok) throw new Error();
+            // 使用 no-cache 模式強制重新抓取最新資料
+            const res = await fetch(FINAL_URL + "&cache_bust=" + Date.now());
+            if (!res.ok) throw new Error("Fetch failed");
             const csvText = await res.text();
             
+            // 解析 CSV
             const rows = csvText.split('\n').filter(r => r.trim() !== "").map(row => 
                 row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim())
             );
@@ -63,10 +65,12 @@
                 return obj;
             });
 
+            // 1. 填充公司
             const compSelect = document.getElementById('company');
             const comps = [...new Set(data.map(d => d["公司清單"]).filter(d => d))];
             comps.forEach(c => compSelect.add(new Option(c, c)));
 
+            // 2. 填充課程
             const list = document.getElementById('course-list');
             data.filter(d => d["課程名稱"]).forEach(c => {
                 const remains = parseInt(c["剩餘名額"]) || 0;
@@ -94,7 +98,8 @@
             document.getElementById('loading').style.display = 'none';
             document.getElementById('app').style.display = 'block';
         } catch (e) {
-            document.getElementById('loading').innerText = "連線失敗，請稍後再試。";
+            console.error("載入出錯：", e);
+            document.getElementById('loading').innerHTML = "資料同步中，請按 <b>F5</b> 重新整理網頁。<br><small>(錯誤代碼：ID_SYNC_ERR)</small>";
         }
     }
 
