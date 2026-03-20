@@ -43,40 +43,38 @@
 <a href="mailto:share.imc.6900@gmail.com?subject=諮詢周邊活動預約" class="contact-icon">📩</a>
 
 <script>
-    // --- 使用您剛剛發布成功的絕對連結 ---
-    const PUBLISH_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=1818244962&single=true&output=csv";
+    // 根據您 5:07 PM 最新截圖更新的發布連結 (GID 變更為 29777723)
+    const FINAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVrkvwGv756FEzkGXrBiB1XlFyoI_8C8-6QWIRY-OQD9PFZ3Dgl8n5mUuZgB_NytEl-J6VwG1gG_Rc/pub?gid=29777723&single=true&output=csv&t=" + new Date().getTime();
 
     async function init() {
         try {
-            const res = await fetch(PUBLISH_URL);
+            const res = await fetch(FINAL_URL);
             if (!res.ok) throw new Error();
             const csvText = await res.text();
             
-            // 解析 CSV 資料 (包含引號處理)
-            const rows = csvText.split('\n').map(row => 
+            const rows = csvText.split('\n').filter(r => r.trim() !== "").map(row => 
                 row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim())
             );
             
             const headers = rows[0];
             const data = rows.slice(1).map(row => {
                 let obj = {};
-                headers.forEach((h, i) => obj[h] = row[i]);
+                headers.forEach((h, i) => { if(h) obj[h] = row[i]; });
                 return obj;
             });
 
-            // 1. 填充公司下拉選單
             const compSelect = document.getElementById('company');
             const comps = [...new Set(data.map(d => d["公司清單"]).filter(d => d))];
             comps.forEach(c => compSelect.add(new Option(c, c)));
 
-            // 2. 填充課程列表
             const list = document.getElementById('course-list');
             data.filter(d => d["課程名稱"]).forEach(c => {
-                const isFull = parseInt(c["剩餘名額"]) <= 0;
+                const remains = parseInt(c["剩餘名額"]) || 0;
+                const isFull = remains <= 0;
                 const div = document.createElement('div');
                 div.className = `course-option ${isFull ? 'disabled' : ''}`;
                 div.innerHTML = `
-                    <span>${c["課程名稱"]} <span class="badge">${isFull ? '額滿' : '剩 '+c["剩餘名額"]}</span></span>
+                    <span>${c["課程名稱"]} <span class="badge">${isFull ? '額滿' : '剩 '+remains}</span></span>
                     <div class="people-container">
                         <span style="font-size:12px; color:#666;">人數:</span>
                         <select class="people-select" onclick="event.stopPropagation()">
@@ -96,7 +94,7 @@
             document.getElementById('loading').style.display = 'none';
             document.getElementById('app').style.display = 'block';
         } catch (e) {
-            document.getElementById('loading').innerText = "連線失敗，請檢查試算表 Settings 分頁名稱與標題。";
+            document.getElementById('loading').innerText = "連線失敗，請稍後再試。";
         }
     }
 
@@ -114,7 +112,6 @@
 
         if(!name || !email || !company || selected.length === 0) return alert("資料填寫不完整喔！");
 
-        // --- 您 3/20 建立的新表單網址 ---
         const googleUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeflEqB7N6HNkp2TurdcbPB5kivfHHUDBznoU1VWsFhoXN5Fw/formResponse?";
         const p = new URLSearchParams();
         p.append("entry.1873199984", name);
@@ -127,7 +124,7 @@
         fetch(googleUrl + p.toString(), { mode: 'no-cors' }).then(() => {
             alert("預約成功！確認信將發送至您的信箱。");
             location.reload();
-        }).catch(() => alert("送出失敗，請確認網路連線。"));
+        }).catch(() => alert("送出失敗，請檢查網路。"));
     }
     init();
 </script>
